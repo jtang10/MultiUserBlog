@@ -77,6 +77,12 @@ input[type=submit] {
     text-decoration: none;
 }
 
+.blog-link {
+    display: block;
+    position: relative;
+    text-align: right;
+}
+
 .post + .post {
     margin-top: 15px;
 }
@@ -103,3 +109,17 @@ input[type=submit] {
     margin-top: 5px;
 }
 
+a.button {
+    -webkit-appearance: button;
+    -moz-appearance: button;
+    appearance: button;
+
+    text-decoration: none;
+    height: 20px;
+    width: 100px;
+    background: #34696f;
+    border: 2px solid rgba(33, 68, 72, 0.59);
+    text-align: center;
+    color: black;
+    font-style: bold;
+}
