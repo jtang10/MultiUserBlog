@@ -97,6 +97,11 @@ input[type=submit] {
     font-weight: bold;
 }
 
+.post-author {
+    bottom: 0px;
+    color: #999;
+}
+
 .post-date {
     position: absolute;
     right: 0px;
