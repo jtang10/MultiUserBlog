@@ -1,8 +1,31 @@
 {% extends "base.html" %}
 
 {% block content %}
-  {{post.render() | safe}}
-  <a href="/blog" class="blog-link">
-  back to front page
+    {{post.render() | safe}}
+    <a href="/blog" class="blog-link">
+        back to front page
     </a>
+
+    Likes: {{post.likes}}
+    <br>
+    Liked By: {{", ".join(post.likedBy)}}
+    <br>
+
+    {% if user %}
+        {% if post.author == user.name %}
+            <form action="/blog/edit/{{post.key().id()}}">
+                <input type="submit" value="EDIT POST" class="first_button">
+            </form>
+            <form action="/blog/delete/{{post.key().id()}}" >
+                <input type="submit" value="DELETE POST" class="second_button">
+            </form>
+        {% else %}
+            <form method="post">
+                <input type="submit" value="Like" class="like_button">
+            </form>
+            {% if error %}
+                <div class="error">{{error}}</div>
+            {% endif %}
+        {% endif %}
+    {% endif %}
 {% endblock %}

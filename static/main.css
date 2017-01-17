@@ -78,9 +78,8 @@ input[type=submit] {
 }
 
 .blog-link {
-    display: block;
-    position: relative;
-    text-align: right;
+    position: absolute;
+    right: 0px;
 }
 
 .post + .post {
@@ -111,6 +110,7 @@ input[type=submit] {
 }
 
 .post-content {
+    position: relative;
     margin-top: 5px;
 }
 
@@ -127,4 +127,35 @@ a.button {
     text-align: center;
     color: black;
     font-style: bold;
+}
+
+input.first_button {
+    position: relative;
+}
+
+input.second_button {
+    position: absolute;
+    bottom: 10px;
+    left: 100px;
+}
+
+input.yes_button {
+    position: relative;
+}
+
+input.no_button {
+    position: absolute;
+    bottom: 10px;
+    left: 55px;
+}
+
+input.back_button {
+    position: relative;
+    top: -20px;
+}
+
+.edit-info {
+    position: relative;
+    top: -42px;
+    left: 120px;
 }

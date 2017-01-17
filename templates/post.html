@@ -9,11 +9,17 @@
     </div>
 
     <div class="post-date">
-      {{p.created.strftime("%b %d, %Y")}}
+      {% if p.created.strftime("%I:%M %p, %b %d, %Y") ==
+            p.last_modified.strftime("%I:%M %p, %b %d, %Y") %}
+        created at {{p.created.strftime("%I:%M %p, %b %d, %Y")}}
+      {% else %}
+        last modified at {{p.last_modified.strftime("%I:%M %p, %b %d, %Y")}}
+      {% endif %}
     </div>
   </div>
 
   <div class="post-content">
     {{p._render_text | safe}}
   </div>
+
 </div>

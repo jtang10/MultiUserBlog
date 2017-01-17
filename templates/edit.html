@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+  {% if user %}
+    {% if post.author == user.name %}
+      <h2>Edit Blog</h2>
+      <div class="edit-info">by {{post.author}} (ID: {{post.key().id()}})</div>
+      <form action="/blog/{{post.key().id()}}" >
+          <input type="submit" value="Back" class="back_button">
+      </form>
+      <form method="post">
+        <label>
+          <div>subject</div>
+          <input type="text" name="subject" value="{{post.subject}}">
+        </label>
+
+        <label>
+          <div>blog</div>
+          <textarea name="content">{{post.content}}</textarea>
+        </label>
+
+        <div class="error">{{post.error}}</div>
+
+        <input type="submit">
+      </form>
+    {% else %}
+      <div class="error">You are not authorized to edit this blog!!!</div>
+      <a href="/blog" class="blog-link">back to front page</a>
+    {% endif %}
+  {% endif %}
+{% endblock %}

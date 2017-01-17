@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 
 {% block content %}
-<a href="/blog/newpost" class="button">Post New Blog</a>
-<br><br>
+<form action="/blog/newpost">
+    <input type="submit" value="Post New Blog" class="newpost_button">
+</form>
+<br>
 
   {% for p in posts %}
     {{ p.render() | safe }}

@@ -3,6 +3,7 @@ import re
 import random
 import hashlib
 import hmac
+import time
 from string import letters
 
 import webapp2
@@ -126,6 +127,8 @@ class Post(db.Model):
     content = db.TextProperty(required = True)
     created = db.DateTimeProperty(auto_now_add = True)
     last_modified = db.DateTimeProperty(auto_now = True)
+    likes = db.IntegerProperty(required = True)
+    likedBy = db.StringListProperty()
 
     def render(self):
         self._render_text = self.content.replace('\n', '<br>')
@@ -144,8 +147,51 @@ class PostPage(BlogHandler):
         if not post:
             self.error(404)
             return
-
         self.render("permalink.html", post = post)
+    def post(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        post = db.get(key)
+        if self.user.name not in post.likedBy:
+            post.likes += 1
+            post.likedBy.append(self.user.name)
+            post.put()
+            error = ""
+        else:
+            error = "Invalid. You have liked this blog."
+        self.render("permalink.html", post = post, error = error)
+
+class EditPost(BlogHandler):
+    def get(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        post = db.get(key)
+        self.render("edit.html", post = post)
+
+    def post(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        post = db.get(key)
+        subject = self.request.get('subject')
+        content = self.request.get('content')
+
+        if subject and content:
+            post.subject = subject
+            post.content = content
+            post.put()
+            self.redirect('/blog/%s' % str(post.key().id()))
+        else:
+            error = "subject and content, please!"
+            self.render("edit.html", subject=subject,
+                        content=content, error=error)
+
+class DeletePost(BlogHandler):
+    def get(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        post = db.get(key)
+        self.render("delete.html", post = post)
+    def post(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        db.delete(key)
+        time.sleep(0.1)
+        self.redirect("/blog")
 
 class NewPost(BlogHandler):
     def get(self):
@@ -161,10 +207,11 @@ class NewPost(BlogHandler):
         subject = self.request.get('subject')
         content = self.request.get('content')
         author = self.user.name
+        likes = 0
 
         if subject and content:
             p = Post(parent = blog_key(), subject = subject,
-                     author = author, content = content)
+                     author = author, content = content, likes = likes)
             p.put()
             self.redirect('/blog/%s' % str(p.key().id()))
         else:
@@ -262,6 +309,8 @@ app = webapp2.WSGIApplication([('/', MainPage),
                                ('/blog/?', BlogFront),
                                ('/blog/([0-9]+)', PostPage),
                                ('/blog/newpost', NewPost),
+                               ('/blog/edit/([0-9]+)', EditPost),
+                               ('/blog/delete/([0-9]+)', DeletePost),
                                ('/signup', Register),
                                ('/login', Login),
                                ('/logout', Logout),

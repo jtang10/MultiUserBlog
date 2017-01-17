@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+    {% if user %}
+        {% if post.author == user.name %}
+            {{post.render() | safe}}
+            <form method="post">
+                <input type="submit" value="Yes" class="yes_button">
+            </form>
+            <form action="/blog/{{post.key().id()}}" method="get">
+                <input type="submit" value="No" class="no_button">
+            </form>
+        {% else %}
+            <div class="error">You are not authorized to delete this blog!!!</div>
+            <a href="/blog" class="blog-link">back to front page</a>
+        {% endif %}
+    {% endif %}
+{% endblock %}
