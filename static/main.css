@@ -92,7 +92,7 @@ input[type=submit] {
 }
 
 .post-title {
-    font-size: 24px;
+    font-size: 30px;
     font-weight: bold;
 }
 
@@ -114,6 +114,32 @@ input[type=submit] {
     margin-top: 5px;
 }
 
+.comment-title {
+    font-size: 24px;
+}
+
+.comment + .comment {
+    margin-top: 10px;
+}
+
+.comment-heading {
+    position: relative;
+    border-bottom: 3px solid #666;
+}
+
+.comment-author {
+    bottom: 0px;
+    color: #999;
+}
+
+.comment-date {
+    position: absolute;
+    right: 0px;
+    bottom: 0px;
+    color: #999;
+
+}
+
 a.button {
     -webkit-appearance: button;
     -moz-appearance: button;
@@ -130,23 +156,11 @@ a.button {
 }
 
 input.first_button {
-    position: relative;
+    float: left;
 }
 
 input.second_button {
-    position: absolute;
-    bottom: 10px;
-    left: 100px;
-}
-
-input.yes_button {
-    position: relative;
-}
-
-input.no_button {
-    position: absolute;
-    bottom: 10px;
-    left: 55px;
+    float: left;
 }
 
 input.back_button {

@@ -143,11 +143,11 @@ class PostPage(BlogHandler):
     def get(self, post_id):
         key = db.Key.from_path('Post', int(post_id), parent=blog_key())
         post = db.get(key)
-
+        comments = Comment.all().order('-created').filter("blog =", int(post_id))
         if not post:
             self.error(404)
             return
-        self.render("permalink.html", post = post)
+        self.render("permalink.html", post = post, comments = comments)
     def post(self, post_id):
         key = db.Key.from_path('Post', int(post_id), parent=blog_key())
         post = db.get(key)
@@ -193,6 +193,40 @@ class DeletePost(BlogHandler):
         time.sleep(0.1)
         self.redirect("/blog")
 
+class EditComment(BlogHandler):
+    def get(self, post_id):
+        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
+        post = db.get(key)
+        self.render("edit.html", post = post)
+
+    def post(self, post_id):
+        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
+        post = db.get(key)
+        subject = self.request.get('subject')
+        content = self.request.get('content')
+
+        if subject and content:
+            post.subject = subject
+            post.content = content
+            post.put()
+            self.redirect('/blog/%s' % str(post.blog))
+        else:
+            error = "subject and content, please!"
+            self.render("edit.html", subject=subject,
+                        content=content, error=error)
+
+class DeleteComment(BlogHandler):
+    def get(self, post_id):
+        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
+        post = db.get(key)
+        self.render("delete.html", post = post)
+    def post(self, post_id):
+        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
+        blog = db.get(key).blog
+        db.delete(key)
+        time.sleep(0.1)
+        self.redirect("/blog/%s" % str(blog))
+
 class NewPost(BlogHandler):
     def get(self):
         if self.user:
@@ -217,6 +251,42 @@ class NewPost(BlogHandler):
         else:
             error = "subject and content, please!"
             self.render("newpost.html", subject=subject,
+                        content=content, error=error)
+
+class Comment(db.Model):
+    subject = db.StringProperty(required = True)
+    author = db.StringProperty(required = True)
+    created = db.DateTimeProperty(auto_now_add = True)
+    last_modified = db.DateTimeProperty(auto_now = True)
+    content = db.TextProperty(required = True)
+    blog = db.IntegerProperty(required = True)
+
+    def render(self):
+        self._render_text = self.content.replace('\n', '<br>')
+        return render_str("comment.html", c = self)
+
+class CommentPost(BlogHandler):
+    def get(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        post = db.get(key)
+        self.render("newcomment.html", post = post)
+    def post(self, post_id):
+        if not self.user:
+            self.redirect('/blog')
+
+        subject = self.request.get('subject')
+        content = self.request.get('content')
+        author = self.user.name
+        blog = int(post_id)
+
+        if subject and content:
+            c = Comment(parent = blog_key(), subject = subject,
+                     author = author, content = content, blog = blog)
+            c.put()
+            self.redirect('/blog/%s' % post_id)
+        else:
+            error = "subject and content, please!"
+            self.render("comment.html", subject=subject,
                         content=content, error=error)
 
 
@@ -311,6 +381,9 @@ app = webapp2.WSGIApplication([('/', MainPage),
                                ('/blog/newpost', NewPost),
                                ('/blog/edit/([0-9]+)', EditPost),
                                ('/blog/delete/([0-9]+)', DeletePost),
+                               ('/blog/comment/([0-9]+)', CommentPost),
+                               ('/blog/comment/edit/([0-9]+)', EditComment),
+                               ('/blog/comment/delete/([0-9]+)', DeleteComment),
                                ('/signup', Register),
                                ('/login', Login),
                                ('/logout', Logout),

@@ -1,0 +1,25 @@
+<div class="comment">
+  <div class="comment-heading">
+    <div class="comment-title">
+      {{c.subject}}
+    </div>
+
+    <div class="comment-author">
+        By {{c.author}}
+    </div>
+
+    <div class="comment-date">
+      {% if c.created.strftime("%I:%M %p, %b %d, %Y") ==
+            c.last_modified.strftime("%I:%M %p, %b %d, %Y") %}
+        created at {{c.created.strftime("%I:%M %p, %b %d, %Y")}}
+      {% else %}
+        last modified at {{c.last_modified.strftime("%I:%M %p, %b %d, %Y")}}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="post-content">
+    {{c._render_text | safe}}
+  </div>
+
+</div>

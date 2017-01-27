@@ -5,10 +5,10 @@
         {% if post.author == user.name %}
             {{post.render() | safe}}
             <form method="post">
-                <input type="submit" value="Yes" class="yes_button">
+                <input type="submit" value="Yes" class="first_button">
             </form>
             <form action="/blog/{{post.key().id()}}" method="get">
-                <input type="submit" value="No" class="no_button">
+                <input type="submit" value="No" class="second_button">
             </form>
         {% else %}
             <div class="error">You are not authorized to delete this blog!!!</div>

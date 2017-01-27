@@ -21,11 +21,33 @@
             </form>
         {% else %}
             <form method="post">
-                <input type="submit" value="Like" class="like_button">
+                <input type="submit" value="LIKE" class="first_button">
+            </form>
+            <form action="/blog/comment/{{post.key().id()}}" >
+                <input type="submit" value="COMMENT" class="second_button">
             </form>
             {% if error %}
                 <div class="error">{{error}}</div>
             {% endif %}
         {% endif %}
+
     {% endif %}
+    {% for i in range(6) %}
+        <br>
+    {% endfor %}
+
+    <div class="post-title">Comments</div>
+    <br><br>
+    {% for c in comments %}
+        {{ c.render() | safe }}
+        {% if c.author == user.name %}
+            <form action="/blog/comment/edit/{{c.key().id()}}">
+                <input type="submit" value="EDIT" class="first_button">
+            </form>
+            <form action="/blog/comment/delete/{{c.key().id()}}" >
+                <input type="submit" value="DELETE" class="second_button">
+            </form>
+        {% endif %}
+        <br><br>
+    {% endfor %}
 {% endblock %}
