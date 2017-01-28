@@ -70,7 +70,7 @@ class MainPage(BlogHandler):
       self.write('Hello, Udacity!')
 
 
-##### user stuff
+# Store User registration information. User name and hashed password
 def make_salt(length = 5):
     return ''.join(random.choice(letters) for x in xrange(length))
 
@@ -116,11 +116,12 @@ class User(db.Model):
             return u
 
 
-##### blog stuff
+#### Handlers about blog post
 
 def blog_key(name = 'default'):
     return db.Key.from_path('blogs', name)
 
+# What will be stored for blogs into database
 class Post(db.Model):
     subject = db.StringProperty(required = True)
     author = db.StringProperty(required = True)
@@ -130,15 +131,18 @@ class Post(db.Model):
     likes = db.IntegerProperty(required = True)
     likedBy = db.StringListProperty()
 
+    # dedicated rendering for blog post. Can be used in both front page and blog page.
     def render(self):
         self._render_text = self.content.replace('\n', '<br>')
         return render_str("post.html", p = self)
 
+# Handler to render the front page.
 class BlogFront(BlogHandler):
     def get(self):
         posts = greetings = Post.all().order('-created')
         self.render('front.html', posts = posts)
 
+# Handler to render the blog page.
 class PostPage(BlogHandler):
     def get(self, post_id):
         key = db.Key.from_path('Post', int(post_id), parent=blog_key())
@@ -160,73 +164,7 @@ class PostPage(BlogHandler):
             error = "Invalid. You have liked this blog."
         self.render("permalink.html", post = post, error = error)
 
-class EditPost(BlogHandler):
-    def get(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
-        post = db.get(key)
-        self.render("edit.html", post = post)
-
-    def post(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
-        post = db.get(key)
-        subject = self.request.get('subject')
-        content = self.request.get('content')
-
-        if subject and content:
-            post.subject = subject
-            post.content = content
-            post.put()
-            self.redirect('/blog/%s' % str(post.key().id()))
-        else:
-            error = "subject and content, please!"
-            self.render("edit.html", subject=subject,
-                        content=content, error=error)
-
-class DeletePost(BlogHandler):
-    def get(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
-        post = db.get(key)
-        self.render("delete.html", post = post)
-    def post(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
-        db.delete(key)
-        time.sleep(0.1)
-        self.redirect("/blog")
-
-class EditComment(BlogHandler):
-    def get(self, post_id):
-        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
-        post = db.get(key)
-        self.render("edit.html", post = post)
-
-    def post(self, post_id):
-        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
-        post = db.get(key)
-        subject = self.request.get('subject')
-        content = self.request.get('content')
-
-        if subject and content:
-            post.subject = subject
-            post.content = content
-            post.put()
-            self.redirect('/blog/%s' % str(post.blog))
-        else:
-            error = "subject and content, please!"
-            self.render("edit.html", subject=subject,
-                        content=content, error=error)
-
-class DeleteComment(BlogHandler):
-    def get(self, post_id):
-        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
-        post = db.get(key)
-        self.render("delete.html", post = post)
-    def post(self, post_id):
-        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
-        blog = db.get(key).blog
-        db.delete(key)
-        time.sleep(0.1)
-        self.redirect("/blog/%s" % str(blog))
-
+# Handler to post a new blog
 class NewPost(BlogHandler):
     def get(self):
         if self.user:
@@ -253,6 +191,42 @@ class NewPost(BlogHandler):
             self.render("newpost.html", subject=subject,
                         content=content, error=error)
 
+# Handler to edit the post.
+class EditPost(BlogHandler):
+    def get(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        post = db.get(key)
+        self.render("edit.html", post = post)
+
+    def post(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        post = db.get(key)
+        subject = self.request.get('subject')
+        content = self.request.get('content')
+
+        if subject and content:
+            post.subject = subject
+            post.content = content
+            post.put()
+            self.redirect('/blog/%s' % str(post.key().id()))
+        else:
+            error = "subject and content, please!"
+            self.render("edit.html", subject=subject,
+                        content=content, error=error)
+
+# Handler to delete the post
+class DeletePost(BlogHandler):
+    def get(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        post = db.get(key)
+        self.render("delete.html", post = post)
+    def post(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        db.delete(key)
+        time.sleep(0.1)
+        self.redirect("/blog")
+
+# SQL Comment
 class Comment(db.Model):
     subject = db.StringProperty(required = True)
     author = db.StringProperty(required = True)
@@ -265,6 +239,7 @@ class Comment(db.Model):
         self._render_text = self.content.replace('\n', '<br>')
         return render_str("comment.html", c = self)
 
+# Handler to post a comment
 class CommentPost(BlogHandler):
     def get(self, post_id):
         key = db.Key.from_path('Post', int(post_id), parent=blog_key())
@@ -289,8 +264,44 @@ class CommentPost(BlogHandler):
             self.render("comment.html", subject=subject,
                         content=content, error=error)
 
+# Handler to edit the comment. Use the same html file with Editpost
+class EditComment(BlogHandler):
+    def get(self, post_id):
+        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
+        post = db.get(key)
+        self.render("edit.html", post = post)
 
-###### Unit 2 HW's
+    def post(self, post_id):
+        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
+        post = db.get(key)
+        subject = self.request.get('subject')
+        content = self.request.get('content')
+
+        if subject and content:
+            post.subject = subject
+            post.content = content
+            post.put()
+            self.redirect('/blog/%s' % str(post.blog))
+        else:
+            error = "subject and content, please!"
+            self.render("edit.html", subject=subject,
+                        content=content, error=error)
+
+# Handler to delete the comment. Use the same html file with DeletePost
+class DeleteComment(BlogHandler):
+    def get(self, post_id):
+        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
+        post = db.get(key)
+        self.render("delete.html", post = post)
+    def post(self, post_id):
+        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
+        blog = db.get(key).blog
+        db.delete(key)
+        time.sleep(0.1)
+        self.redirect("/blog/%s" % str(blog))
+
+
+# Check if user signup is valid
 USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
 def valid_username(username):
     return username and USER_RE.match(username)
@@ -340,6 +351,7 @@ class Signup(BlogHandler):
     def done(self, *a, **kw):
         raise NotImplementedError
 
+# Handler to register for a new account
 class Register(Signup):
     def done(self):
         #make sure the user doesn't already exist
@@ -354,6 +366,7 @@ class Register(Signup):
             self.login(u)
             self.redirect('/blog')
 
+# Handler to login the user
 class Login(BlogHandler):
     def get(self):
         self.render('login-form.html')
@@ -370,6 +383,7 @@ class Login(BlogHandler):
             msg = 'Invalid login'
             self.render('login-form.html', error = msg)
 
+# Handler to logout the user
 class Logout(BlogHandler):
     def get(self):
         self.logout()
