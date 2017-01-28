@@ -20,3 +20,4 @@ The following tutorial will go through the main steps of trying this website. Fo
  3. Install App Engine Python extension.
  4. Download my project from [here](https://github.com/jtang10/MultiUserBlog.git).
  5. navigate to the project folder and type in `dev_appserver.py .` and access [http://localhost:8080/blog](http://localhost:8080/blog) through the browser. You can also acces it at.
+ 6. The website can be access from [https://hello-world-jtang10.appspot.com/blog](https://hello-world-jtang10.appspot.com/blog).
