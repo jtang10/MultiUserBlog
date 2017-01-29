@@ -1,12 +1,9 @@
 import os
 import re
-import random
-import hashlib
-import hmac
 import time
 import blogdb
 from blogdb import User, Post, Comment
-from string import letters
+from helper import *
 
 import webapp2
 import jinja2
@@ -17,23 +14,13 @@ template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_env = jinja2.Environment(loader = jinja2.FileSystemLoader(template_dir),
                                autoescape = True)
 
-secret = 'lebronjames'
-
 def render_str(template, **params):
     t = jinja_env.get_template(template)
     return t.render(params)
 
-
-def make_secure_val(val):
-    """Return val and hashed val using hmac"""
-    return '%s|%s' % (val, hmac.new(secret, val).hexdigest())
-
-def check_secure_val(secure_val):
-    """Check if val and hased result match"""
-    val = secure_val.split('|')[0]
-    if secure_val == make_secure_val(val):
-        return val
-
+def render_post(response, post):
+    response.out.write('<b>' + post.subject + '</b><br>')
+    response.out.write(post.content)
 
 class BlogHandler(webapp2.RequestHandler):
     """ Basic handler for this blog website.
@@ -76,27 +63,9 @@ class BlogHandler(webapp2.RequestHandler):
         self.user = uid and User.by_id(int(uid))
 
 
-def render_post(response, post):
-    response.out.write('<b>' + post.subject + '</b><br>')
-    response.out.write(post.content)
-
 class MainPage(BlogHandler):
   def get(self):
       self.write('Hello, Udacity!')
-
-# Hash the users' passwords and check if matched in user authentication.
-def make_salt(length = 5):
-    return ''.join(random.choice(letters) for x in xrange(length))
-
-def make_pw_hash(name, pw, salt = None):
-    if not salt:
-        salt = make_salt()
-    h = hashlib.sha256(name + pw + salt).hexdigest()
-    return '%s,%s' % (salt, h)
-
-def valid_pw(name, password, h):
-    salt = h.split(',')[0]
-    return h == make_pw_hash(name, password, salt)
 
 
 class BlogFront(BlogHandler):
