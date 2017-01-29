@@ -4,6 +4,8 @@ import random
 import hashlib
 import hmac
 import time
+import blogdb
+from blogdb import User, Post, Comment
 from string import letters
 
 import webapp2
@@ -15,20 +17,24 @@ template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_env = jinja2.Environment(loader = jinja2.FileSystemLoader(template_dir),
                                autoescape = True)
 
-secret = 'fart'
+secret = 'lebronjames'
 
 def render_str(template, **params):
     t = jinja_env.get_template(template)
     return t.render(params)
 
+
 def make_secure_val(val):
+    """Return val and hashed val using hmac"""
     return '%s|%s' % (val, hmac.new(secret, val).hexdigest())
 
 def check_secure_val(secure_val):
+    """Check if val and hased result match"""
     val = secure_val.split('|')[0]
     if secure_val == make_secure_val(val):
         return val
 
+# Basic bloghandler that provides HTML rendering, set up cookie and so on.
 class BlogHandler(webapp2.RequestHandler):
     def write(self, *a, **kw):
         self.response.out.write(*a, **kw)
@@ -69,8 +75,7 @@ class MainPage(BlogHandler):
   def get(self):
       self.write('Hello, Udacity!')
 
-
-# Store User registration information. User name and hashed password
+# Hash the users' passwords and check if matched in user authentication.
 def make_salt(length = 5):
     return ''.join(random.choice(letters) for x in xrange(length))
 
@@ -84,57 +89,6 @@ def valid_pw(name, password, h):
     salt = h.split(',')[0]
     return h == make_pw_hash(name, password, salt)
 
-def users_key(group = 'default'):
-    return db.Key.from_path('users', group)
-
-class User(db.Model):
-    name = db.StringProperty(required = True)
-    pw_hash = db.StringProperty(required = True)
-    email = db.StringProperty()
-
-    @classmethod
-    def by_id(cls, uid):
-        return User.get_by_id(uid, parent = users_key())
-
-    @classmethod
-    def by_name(cls, name):
-        u = User.all().filter('name =', name).get()
-        return u
-
-    @classmethod
-    def register(cls, name, pw, email = None):
-        pw_hash = make_pw_hash(name, pw)
-        return User(parent = users_key(),
-                    name = name,
-                    pw_hash = pw_hash,
-                    email = email)
-
-    @classmethod
-    def login(cls, name, pw):
-        u = cls.by_name(name)
-        if u and valid_pw(name, pw, u.pw_hash):
-            return u
-
-
-#### Handlers about blog post
-
-def blog_key(name = 'default'):
-    return db.Key.from_path('blogs', name)
-
-# What will be stored for blogs into database
-class Post(db.Model):
-    subject = db.StringProperty(required = True)
-    author = db.StringProperty(required = True)
-    content = db.TextProperty(required = True)
-    created = db.DateTimeProperty(auto_now_add = True)
-    last_modified = db.DateTimeProperty(auto_now = True)
-    likes = db.IntegerProperty(required = True)
-    likedBy = db.StringListProperty()
-
-    # dedicated rendering for blog post. Can be used in both front page and blog page.
-    def render(self):
-        self._render_text = self.content.replace('\n', '<br>')
-        return render_str("post.html", p = self)
 
 # Handler to render the front page.
 class BlogFront(BlogHandler):
@@ -142,27 +96,37 @@ class BlogFront(BlogHandler):
         posts = greetings = Post.all().order('-created')
         self.render('front.html', posts = posts)
 
-# Handler to render the blog page.
+# Handler to render the blog page. Strong Consistency for comments query.
 class PostPage(BlogHandler):
     def get(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
         post = db.get(key)
-        comments = Comment.all().order('-created').filter("blog =", int(post_id))
+        comments = Comment.all().order('-created')
+        comments = comments.filter("blog =", int(post_id))
+        comments = comments.ancestor(blogdb.comment_key())
+
+        # render 404 page if no such blog found.
         if not post:
-            self.error(404)
+            self.render('notfound.html')
             return
         self.render("permalink.html", post = post, comments = comments)
+
+    # Post handles like function. If liked, update the post db model.
     def post(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
         post = db.get(key)
-        if self.user.name not in post.likedBy:
-            post.likes += 1
-            post.likedBy.append(self.user.name)
-            post.put()
-            error = ""
-        else:
-            error = "Invalid. You have liked this blog."
-        self.render("permalink.html", post = post, error = error)
+        comments = Comment.all().order('-created')
+        comments = comments.filter("blog =", int(post_id))
+        comments = comments.ancestor(blogdb.comment_key())
+        if self.user:
+            if self.user.name != post.author and self.user.name not in post.likedBy:
+                post.likes += 1
+                post.likedBy.append(self.user.name)
+                post.put()
+                error = ""
+            else:
+                error = "Invalid. You have liked this blog."
+        self.render("permalink.html", post = post, error = error, comments = comments)
 
 # Handler to post a new blog
 class NewPost(BlogHandler):
@@ -170,11 +134,11 @@ class NewPost(BlogHandler):
         if self.user:
             self.render("newpost.html")
         else:
-            self.redirect("/login")
+            return self.redirect("/login")
 
     def post(self):
         if not self.user:
-            self.redirect('/blog')
+            return self.redirect('/blog')
 
         subject = self.request.get('subject')
         content = self.request.get('content')
@@ -182,7 +146,7 @@ class NewPost(BlogHandler):
         likes = 0
 
         if subject and content:
-            p = Post(parent = blog_key(), subject = subject,
+            p = Post(parent = blogdb.blog_key(), subject = subject,
                      author = author, content = content, likes = likes)
             p.put()
             self.redirect('/blog/%s' % str(p.key().id()))
@@ -194,12 +158,18 @@ class NewPost(BlogHandler):
 # Handler to edit the post.
 class EditPost(BlogHandler):
     def get(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
-        post = db.get(key)
-        self.render("edit.html", post = post)
+        if self.user:
+            key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
+            post = db.get(key)
+            if post and self.user.name == post.author:
+                self.render("edit.html", post = post)
+            else:
+                self.render("unauthorized.html")
+        else:
+            self.redirect("/login")
 
     def post(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
         post = db.get(key)
         subject = self.request.get('subject')
         content = self.request.get('content')
@@ -217,37 +187,38 @@ class EditPost(BlogHandler):
 # Handler to delete the post
 class DeletePost(BlogHandler):
     def get(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
-        post = db.get(key)
-        self.render("delete.html", post = post)
+        if self.user:
+            key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
+            post = db.get(key)
+            if post and self.user.name == post.author:
+                self.render("delete.html", post = post)
+            else:
+                self.render("unauthorized.html")
+        else:
+            self.redirect("/login")
+
     def post(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
         db.delete(key)
-        time.sleep(0.1)
         self.redirect("/blog")
 
-# SQL Comment
-class Comment(db.Model):
-    subject = db.StringProperty(required = True)
-    author = db.StringProperty(required = True)
-    created = db.DateTimeProperty(auto_now_add = True)
-    last_modified = db.DateTimeProperty(auto_now = True)
-    content = db.TextProperty(required = True)
-    blog = db.IntegerProperty(required = True)
-
-    def render(self):
-        self._render_text = self.content.replace('\n', '<br>')
-        return render_str("comment.html", c = self)
 
 # Handler to post a comment
 class CommentPost(BlogHandler):
     def get(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
-        post = db.get(key)
-        self.render("newcomment.html", post = post)
+        if self.user:
+            key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
+            post = db.get(key)
+            if post and self.user.name != post.author:
+                self.render("newcomment.html", post = post)
+            else:
+                self.render("unauthorized.html")
+        else:
+            self.redirect("/login")
+
     def post(self, post_id):
         if not self.user:
-            self.redirect('/blog')
+            return self.redirect('/blog')
 
         subject = self.request.get('subject')
         content = self.request.get('content')
@@ -255,7 +226,7 @@ class CommentPost(BlogHandler):
         blog = int(post_id)
 
         if subject and content:
-            c = Comment(parent = blog_key(), subject = subject,
+            c = Comment(parent = blogdb.comment_key(), subject = subject,
                      author = author, content = content, blog = blog)
             c.put()
             self.redirect('/blog/%s' % post_id)
@@ -267,12 +238,18 @@ class CommentPost(BlogHandler):
 # Handler to edit the comment. Use the same html file with Editpost
 class EditComment(BlogHandler):
     def get(self, post_id):
-        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
-        post = db.get(key)
-        self.render("edit.html", post = post)
+        if self.user:
+            key = db.Key.from_path('Comment', int(post_id), parent=blogdb.comment_key())
+            post = db.get(key)
+            if post and self.user.name == post.author:
+                self.render("edit.html", post = post)
+            else:
+                self.render("unauthorized.html")
+        else:
+            self.redirect("/login")
 
     def post(self, post_id):
-        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
+        key = db.Key.from_path('Comment', int(post_id), parent=blogdb.comment_key())
         post = db.get(key)
         subject = self.request.get('subject')
         content = self.request.get('content')
@@ -290,11 +267,18 @@ class EditComment(BlogHandler):
 # Handler to delete the comment. Use the same html file with DeletePost
 class DeleteComment(BlogHandler):
     def get(self, post_id):
-        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
-        post = db.get(key)
-        self.render("delete.html", post = post)
+        if self.user:
+            key = db.Key.from_path('Comment', int(post_id), parent=blogdb.comment_key())
+            post = db.get(key)
+            if post and self.user.name == post.author:
+                self.render("delete.html", post = post)
+            else:
+                self.render("unauthorized.html")
+        else:
+            self.redirect("/login")
+
     def post(self, post_id):
-        key = db.Key.from_path('Comment', int(post_id), parent=blog_key())
+        key = db.Key.from_path('Comment', int(post_id), parent=blogdb.comment_key())
         blog = db.get(key).blog
         db.delete(key)
         time.sleep(0.1)
@@ -354,7 +338,7 @@ class Signup(BlogHandler):
 # Handler to register for a new account
 class Register(Signup):
     def done(self):
-        #make sure the user doesn't already exist
+        # make sure the user doesn't already exist
         u = User.by_name(self.username)
         if u:
             msg = 'That user already exists.'
@@ -389,7 +373,7 @@ class Logout(BlogHandler):
         self.logout()
         self.redirect('/blog')
 
-app = webapp2.WSGIApplication([('/', MainPage),
+app = webapp2.WSGIApplication([('/', BlogFront),
                                ('/blog/?', BlogFront),
                                ('/blog/([0-9]+)', PostPage),
                                ('/blog/newpost', NewPost),

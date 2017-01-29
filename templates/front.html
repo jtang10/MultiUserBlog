@@ -8,7 +8,6 @@
 
   {% for p in posts %}
     {{ p.render() | safe }}
-    <a href="/blog/comment/{{ p.key().id() }}" class="comment-link">comment</a>
     <a href="/blog/{{ p.key().id() }}" class="blog-link">go to this blog</a>
 
     <br><br>

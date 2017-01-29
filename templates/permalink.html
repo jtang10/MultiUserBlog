@@ -26,9 +26,7 @@
             <form action="/blog/comment/{{post.key().id()}}" >
                 <input type="submit" value="COMMENT" class="second_button">
             </form>
-            {% if error %}
-                <div class="error">{{error}}</div>
-            {% endif %}
+            <div class="error">{{error}}</div>
         {% endif %}
 
     {% endif %}
