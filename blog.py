@@ -34,8 +34,16 @@ def check_secure_val(secure_val):
     if secure_val == make_secure_val(val):
         return val
 
-# Basic bloghandler that provides HTML rendering, set up cookie and so on.
+
 class BlogHandler(webapp2.RequestHandler):
+    """ Basic handler for this blog website.
+
+    Key functions:
+    render -- render the HTML page.
+    login -- set cookie for user login.
+    logout -- reset the cookie.
+    intialized: initialize the page and get user info if logged in.
+    """
     def write(self, *a, **kw):
         self.response.out.write(*a, **kw)
 
@@ -67,6 +75,7 @@ class BlogHandler(webapp2.RequestHandler):
         uid = self.read_secure_cookie('user_id')
         self.user = uid and User.by_id(int(uid))
 
+
 def render_post(response, post):
     response.out.write('<b>' + post.subject + '</b><br>')
     response.out.write(post.content)
@@ -90,14 +99,20 @@ def valid_pw(name, password, h):
     return h == make_pw_hash(name, password, salt)
 
 
-# Handler to render the front page.
 class BlogFront(BlogHandler):
+    """Handler for root of website."""
     def get(self):
         posts = greetings = Post.all().order('-created')
         self.render('front.html', posts = posts)
 
-# Handler to render the blog page. Strong Consistency for comments query.
+
 class PostPage(BlogHandler):
+    """Display individual blogs
+
+    GET displays the blogs and related comments, 404 if no such blog.
+    POST process the likes only. Can only be likes once by anyone but the
+         author of this blog.
+    """
     def get(self, post_id):
         key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
         post = db.get(key)
@@ -111,7 +126,7 @@ class PostPage(BlogHandler):
             return
         self.render("permalink.html", post = post, comments = comments)
 
-    # Post handles like function. If liked, update the post db model.
+
     def post(self, post_id):
         key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
         post = db.get(key)
@@ -128,8 +143,13 @@ class PostPage(BlogHandler):
                 error = "Invalid. You have liked this blog."
         self.render("permalink.html", post = post, error = error, comments = comments)
 
-# Handler to post a new blog
+
 class NewPost(BlogHandler):
+    """Allow registered user to create new blog
+
+    GET renders the newpost page and redirect to login if no user.
+    POST initialize likes to 0 and store the blog to db.
+    """
     def get(self):
         if self.user:
             self.render("newpost.html")
@@ -155,8 +175,14 @@ class NewPost(BlogHandler):
             self.render("newpost.html", subject=subject,
                         content=content, error=error)
 
-# Handler to edit the post.
+
 class EditPost(BlogHandler):
+    """Allow author to edit his/her own blogs.
+
+    GET displays the blog. If not logged in, ask to login. Will not render
+        the page if not authorized.
+    POST saves the modified blog back to db.
+    """
     def get(self, post_id):
         if self.user:
             key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
@@ -169,23 +195,35 @@ class EditPost(BlogHandler):
             self.redirect("/login")
 
     def post(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
-        post = db.get(key)
-        subject = self.request.get('subject')
-        content = self.request.get('content')
+        if self.user:
+            key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
+            post = db.get(key)
+            if post and self.user.name == post.author:
+                subject = self.request.get('subject')
+                content = self.request.get('content')
 
-        if subject and content:
-            post.subject = subject
-            post.content = content
-            post.put()
-            self.redirect('/blog/%s' % str(post.key().id()))
+                if subject and content:
+                    post.subject = subject
+                    post.content = content
+                    post.put()
+                    self.redirect('/blog/%s' % str(post.key().id()))
+                else:
+                    error = "subject and content, please!"
+                    self.render("edit.html", subject=subject,
+                                content=content, error=error)
+            else:
+                self.render("unauthorized.html")
         else:
-            error = "subject and content, please!"
-            self.render("edit.html", subject=subject,
-                        content=content, error=error)
+            self.redirect("/login")
 
-# Handler to delete the post
+
 class DeletePost(BlogHandler):
+    """Allow author to delete his/her own blogs.
+
+    GET displays the blog. If not logged in, ask to login. Will not render
+        the page if not authorized.
+    POST deletes the blog from db.
+    """
     def get(self, post_id):
         if self.user:
             key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
@@ -198,13 +236,24 @@ class DeletePost(BlogHandler):
             self.redirect("/login")
 
     def post(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
-        db.delete(key)
-        self.redirect("/blog")
+        if self.user:
+            key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
+            if post and self.user.name == post.author:
+                db.delete(key)
+                self.redirect("/blog")
+            else:
+                self.render("unauthorized.html")
+        else:
+            self.redirect("/login")
 
 
-# Handler to post a comment
 class CommentPost(BlogHandler):
+    """Allow anyone but the author of this blog to comment.
+
+    GET displays the newcomment.html. If not logged in, ask to login.
+        Will not render the page if not authorized.
+    POST stores the comment in the db.
+    """
     def get(self, post_id):
         if self.user:
             key = db.Key.from_path('Post', int(post_id), parent=blogdb.blog_key())
@@ -235,70 +284,99 @@ class CommentPost(BlogHandler):
             self.render("comment.html", subject=subject,
                         content=content, error=error)
 
-# Handler to edit the comment. Use the same html file with Editpost
+
 class EditComment(BlogHandler):
+    """Allow author of comments to edit them.
+
+    GET displays the comment. If not logged in, ask to login.
+        Will not render the page if not authorized.
+    POST stores the modified comment in the db.
+    """
     def get(self, post_id):
         if self.user:
             key = db.Key.from_path('Comment', int(post_id), parent=blogdb.comment_key())
-            post = db.get(key)
-            if post and self.user.name == post.author:
-                self.render("edit.html", post = post)
+            comment = db.get(key)
+            if comment and self.user.name == comment.author:
+                # still pass the comment into edit.html as post to reuse html.
+                self.render("edit.html", post = comment)
             else:
                 self.render("unauthorized.html")
         else:
             self.redirect("/login")
 
     def post(self, post_id):
-        key = db.Key.from_path('Comment', int(post_id), parent=blogdb.comment_key())
-        post = db.get(key)
-        subject = self.request.get('subject')
-        content = self.request.get('content')
+        if self.user:
+            key = db.Key.from_path('Comment', int(post_id), parent=blogdb.comment_key())
+            comment = db.get(key)
+            if comment and self.user.name == comment.author:
+                subject = self.request.get('subject')
+                content = self.request.get('content')
 
-        if subject and content:
-            post.subject = subject
-            post.content = content
-            post.put()
-            self.redirect('/blog/%s' % str(post.blog))
+                if subject and content:
+                    comment.subject = subject
+                    comment.content = content
+                    comment.put()
+                    self.redirect('/blog/%s' % str(comment.blog))
+                else:
+                    error = "subject and content, please!"
+                    self.render("edit.html", subject=subject,
+                                content=content, error=error)
+            else:
+                self.render("unauthorized.html")
         else:
-            error = "subject and content, please!"
-            self.render("edit.html", subject=subject,
-                        content=content, error=error)
+            self.redirect("/login")
 
-# Handler to delete the comment. Use the same html file with DeletePost
+
 class DeleteComment(BlogHandler):
+    """Allow author of the comments to delete them.
+
+    GET displays the newcomment.html. If not logged in, ask to login.
+        Will not render the page if not authorized.
+    POST delete the comment from db.
+    """
     def get(self, post_id):
         if self.user:
             key = db.Key.from_path('Comment', int(post_id), parent=blogdb.comment_key())
-            post = db.get(key)
-            if post and self.user.name == post.author:
-                self.render("delete.html", post = post)
+            comment = db.get(key)
+            if comment and self.user.name == comment.author:
+                # still pass the comment into edit.html as post to reuse html.
+                self.render("delete.html", post = comment)
             else:
                 self.render("unauthorized.html")
         else:
             self.redirect("/login")
 
     def post(self, post_id):
-        key = db.Key.from_path('Comment', int(post_id), parent=blogdb.comment_key())
-        blog = db.get(key).blog
-        db.delete(key)
-        time.sleep(0.1)
-        self.redirect("/blog/%s" % str(blog))
+        if self.user:
+            key = db.Key.from_path('Comment', int(post_id), parent=blogdb.comment_key())
+            comment = db.get(key)
+            if comment and self.user.name == comment.author:
+                blog = comment.blog
+                db.delete(key)
+                self.redirect("/blog/%s" % str(blog))
+            else:
+                self.render("unauthorized.html")
+        else:
+            self.redirect("/login")
 
 
 # Check if user signup is valid
-USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
-def valid_username(username):
-    return username and USER_RE.match(username)
 
-PASS_RE = re.compile(r"^.{3,20}$")
-def valid_password(password):
-    return password and PASS_RE.match(password)
-
-EMAIL_RE  = re.compile(r'^[\S]+@[\S]+\.[\S]+$')
-def valid_email(email):
-    return not email or EMAIL_RE.match(email)
 
 class Signup(BlogHandler):
+    USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
+    PASS_RE = re.compile(r"^.{3,20}$")
+    EMAIL_RE  = re.compile(r'^[\S]+@[\S]+\.[\S]+$')
+
+    def valid_username(self, username):
+        return username and Signup.USER_RE.match(username)
+
+    def valid_password(self, password):
+        return password and Signup.PASS_RE.match(password)
+
+    def valid_email(self, email):
+        return not email or Signup.EMAIL_RE.match(email)
+
     def get(self):
         self.render("signup-form.html")
 
@@ -312,18 +390,18 @@ class Signup(BlogHandler):
         params = dict(username = self.username,
                       email = self.email)
 
-        if not valid_username(self.username):
+        if not self.valid_username(self.username):
             params['error_username'] = "That's not a valid username."
             have_error = True
 
-        if not valid_password(self.password):
+        if not self.valid_password(self.password):
             params['error_password'] = "That wasn't a valid password."
             have_error = True
         elif self.password != self.verify:
             params['error_verify'] = "Your passwords didn't match."
             have_error = True
 
-        if not valid_email(self.email):
+        if not self.valid_email(self.email):
             params['error_email'] = "That's not a valid email."
             have_error = True
 
@@ -350,6 +428,7 @@ class Register(Signup):
             self.login(u)
             self.redirect('/blog')
 
+
 # Handler to login the user
 class Login(BlogHandler):
     def get(self):
@@ -366,6 +445,7 @@ class Login(BlogHandler):
         else:
             msg = 'Invalid login'
             self.render('login-form.html', error = msg)
+
 
 # Handler to logout the user
 class Logout(BlogHandler):
